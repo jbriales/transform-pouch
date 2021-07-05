@@ -90,10 +90,18 @@ exports.transform = exports.filter = function transform(config) {
   };
 
   handlers.bulkDocs = function (orig, args) {
-    for (var i = 0; i < args.docs.length; i++) {
-      args.docs[i] = incoming(args.docs[i]);
-    }
-    return Promise.all(args.docs).then(function (docs) {
+    const runIncomingSequentially = async () => {
+      // Run sequentially rather than as parallel promises
+      // to avoid potential revision conflicts if transform function
+      // has side effects on the DB
+      const output = [];
+      for (var i = 0; i < args.docs.length; i++) {
+        output.push(await incoming(args.docs[i]));
+      }
+      return output;
+    };
+
+    return runIncomingSequentially().then(function(docs) {
       args.docs = docs;
       return orig();
     });
